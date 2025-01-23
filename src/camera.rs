@@ -7,22 +7,16 @@ const VIEWPORT_HEIGHT: f64 = 2.0;
 // px_dw, px_dh is constant after creation of camera, while those depend on chosen arbitrary
 // viewport size.
 pub struct Camera {
-    pub pos: Point,
+    pos: Point,
     focal_len: f64,
     vpv_h: Point,
     vpv_w: Point,
-    px_dw: Point,
-    px_dh: Point,
+    pub px_dw: Point,
+    pub px_dh: Point,
 }
 
 impl Camera {
-    pub fn new(initial_pos: Point, img_width: u32, ratio: u32, focal_len: f64) -> Self {
-        let img_height: u32 = if img_width / ratio < 1 {
-            1
-        } else {
-            img_width / ratio
-        };
-
+    pub fn new(initial_pos: Point, img_width: u32, img_height: u32, focal_len: f64) -> Self {
         // viewport, arbitrary size in virtual units
         let vp_w = VIEWPORT_HEIGHT * (img_width as f64 / img_height as f64);
         // viewport vectors
@@ -32,12 +26,6 @@ impl Camera {
         // pixel spacing, pixel delta
         let px_dw = vpv_w / img_width as f64;
         let px_dh = vpv_h / img_height as f64;
-
-        // upper left pixel in viewport
-        let upleft_px_pos = initial_pos - Point::new(0.0, 0.0, focal_len) - (vpv_w + vpv_h) * 0.5;
-        // (0,0) pixel pos
-        let px00_pos = upleft_px_pos + (px_dw + px_dh) * 0.5;
-
         Camera {
             pos: initial_pos,
             focal_len,
@@ -46,6 +34,10 @@ impl Camera {
             px_dw,
             px_dh,
         }
+    }
+
+    pub fn pos(&self) -> Point {
+        self.pos
     }
 
     // upper left of viewport
