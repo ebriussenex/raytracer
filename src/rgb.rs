@@ -21,8 +21,8 @@ impl Rgb {
         Rgb { rgb: [r, g, b] }
     }
 
-    pub fn write(&self, mut str: impl Write) -> Result<()> {
-        str.write_all(self.to_string().as_bytes())?;
+    pub fn write(&self, mut stream: impl Write) -> Result<()> {
+        stream.write_all(self.to_string().as_bytes())?;
         Ok(())
     }
 }
