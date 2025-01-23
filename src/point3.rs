@@ -36,6 +36,10 @@ impl Point {
     pub fn size(&self) -> f64 {
         f64::sqrt(self.e[0] * self.e[0] + self.e[1] * self.e[1] + self.e[2] * self.e[2])
     }
+
+    pub fn scalar_prod(&self, rhs: Point) -> f64 {
+        self.x() * rhs.x() + self.y() * rhs.y() + self.z() * rhs.z()
+    }
 }
 
 impl Add for Point {

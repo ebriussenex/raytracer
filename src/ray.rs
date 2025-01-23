@@ -5,7 +5,7 @@ pub struct Ray {
     dir: Point,
 }
 
-type Colorizer = fn(&Ray) -> Rgb;
+pub type Colorizer = Box<dyn Fn(&Ray) -> Rgb>;
 
 impl Ray {
     pub fn new(orig: Point, dir: Point) -> Self {
@@ -14,6 +14,10 @@ impl Ray {
 
     pub fn dir(&self) -> Point {
         self.dir
+    }
+
+    pub fn orig(&self) -> Point {
+        self.orig
     }
 
     pub fn at(&self, t: f64) -> Point {

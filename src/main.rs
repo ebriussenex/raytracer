@@ -2,6 +2,7 @@ pub mod camera;
 pub mod point3;
 pub mod ray;
 pub mod rgb;
+pub mod sphere;
 
 use std::{
     io::{self, Write},
@@ -10,15 +11,25 @@ use std::{
 
 use camera::Camera;
 use point3::Point;
-use ray::Ray;
+use ray::{Colorizer, Ray};
 use rgb::Rgb;
+use sphere::Sphere;
 
 const RATIO: u32 = 2;
 
-fn blend_colorizer(r: &Ray) -> Rgb {
-    let unit_dir = r.dir().unit();
-    let a = 0.5 * (unit_dir.y() + 1.0);
-    Rgb::new(1.0, 1.0, 1.0) * (1.0 - a) + Rgb::new(0.5, 0.7, 1.0) * a
+// TODO: more allocation, same could be done with no box, and with impl
+fn with_sphere(sphere: Sphere) -> Colorizer {
+    Box::new(move |r| blend_colorizer(sphere, r))
+}
+
+fn blend_colorizer(sphere: Sphere, r: &Ray) -> Rgb {
+    if sphere.hit(r) {
+        Rgb::new(1.0, 0.0, 0.0)
+    } else {
+        let unit_dir = r.dir().unit();
+        let a = 0.5 * (unit_dir.y() + 1.0);
+        Rgb::new(1.0, 1.0, 1.0) * (1.0 - a) + Rgb::new(0.5, 0.7, 1.0) * a
+    }
 }
 
 fn main() {
@@ -30,6 +41,7 @@ fn main() {
     };
 
     let c = Camera::new(Point::new(0.0, 0.0, 0.0), img_width, img_height, 1.0);
+    let sphere = Sphere::new(0.5, Point::new(0.0, 0.0, -1.0));
 
     if let Err(e) =
         io::stdout().write_all(format!("P3\n{} {}\n255\n", img_width, img_height).as_bytes())
@@ -45,7 +57,7 @@ fn main() {
             let ray_dir = px_center - c.pos();
             let ray = Ray::new(c.pos(), ray_dir);
             let _default_colorizer = |_ray: &Ray| Rgb::new(0.0, 0.0, 0.0);
-            let px_color = ray.color(blend_colorizer);
+            let px_color = ray.color(with_sphere(sphere));
             px_color.write(io::stdout()).unwrap();
         });
     });
