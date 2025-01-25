@@ -1,19 +1,20 @@
-pub mod camera;
-pub mod point3;
-pub mod ray;
-pub mod rgb;
-pub mod sphere;
+mod camera;
+mod core;
+mod scene;
 
+use core::{
+    point3::Point,
+    ray::{Colorizer, Ray},
+    rgb::Rgb,
+};
 use std::{
     io::{self, Write},
     process::exit,
 };
 
-use camera::Camera;
-use point3::Point;
-use ray::{Colorizer, Ray};
-use rgb::Rgb;
-use sphere::Sphere;
+use scene::sphere::Sphere;
+
+use crate::camera::camera::Camera;
 
 const RATIO: u32 = 2;
 
