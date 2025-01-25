@@ -23,8 +23,10 @@ fn with_sphere(sphere: Sphere) -> Colorizer {
 }
 
 fn blend_colorizer(sphere: Sphere, r: &Ray) -> Rgb {
-    if sphere.hit(r) {
-        Rgb::new(1.0, 0.0, 0.0)
+    if let Some(t) = sphere.hit(r) {
+        let n = (r.at(t) - Point::new(0.0, 0.0, -1.0)).unit();
+        eprintln!("hit sphere - ray: {:?}, n: {:?}", r.at(t), n);
+        Rgb::new(n.x() + 1.0, n.y() + 1.0, n.z() + 1.0) * 0.5
     } else {
         let unit_dir = r.dir().unit();
         let a = 0.5 * (unit_dir.y() + 1.0);
@@ -33,7 +35,7 @@ fn blend_colorizer(sphere: Sphere, r: &Ray) -> Rgb {
 }
 
 fn main() {
-    let img_width: u32 = 400;
+    let img_width: u32 = 800;
     let img_height: u32 = if img_width / RATIO < 1 {
         1
     } else {

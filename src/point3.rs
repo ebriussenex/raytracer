@@ -23,22 +23,24 @@ impl Point {
     }
 
     pub fn unit(&self) -> Self {
-        Point {
-            e: self.e.map(|x| {
-                let r = x / self.size();
-                assert!(r < 1.0);
-                r
-            }),
-        }
+        *self / self.size()
     }
 
     // vector length
     pub fn size(&self) -> f64 {
-        f64::sqrt(self.e[0] * self.e[0] + self.e[1] * self.e[1] + self.e[2] * self.e[2])
+        f64::sqrt(self.squared_size())
     }
 
-    pub fn scalar_prod(&self, rhs: Point) -> f64 {
-        self.x() * rhs.x() + self.y() * rhs.y() + self.z() * rhs.z()
+    fn squared_size(&self) -> f64 {
+        self.e[0] * self.e[0] + self.e[1] * self.e[1] + self.e[2] * self.e[2]
+    }
+
+    pub fn scalar_prod(&self, rhs: &Point) -> f64 {
+        if self == rhs {
+            self.squared_size()
+        } else {
+            self.x() * rhs.x() + self.y() * rhs.y() + self.z() * rhs.z()
+        }
     }
 }
 

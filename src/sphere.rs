@@ -10,13 +10,21 @@ impl Sphere {
     pub fn new(r: f64, c: Point) -> Self {
         Sphere { r, c }
     }
-    pub fn hit(&self, ray: &Ray) -> bool {
+    pub fn hit(&self, ray: &Ray) -> Option<f64> {
         // temp vec for sphere center - origin of ray
         let oc = self.c - ray.orig();
         // quad equation
-        let a = ray.dir().scalar_prod(ray.dir());
-        let b = ray.dir().scalar_prod(oc) * 2.0;
-        let c = oc.scalar_prod(oc) - self.r * self.r;
-        b * b - 4.0 * a * c > 0.0
+        // it's less computation if we assume b = -2h
+        // thus h = (d, (C - Q)); t = (h - sqrt(d)/a);
+        let a = ray.dir().scalar_prod(&ray.dir());
+        let h = ray.dir().scalar_prod(&oc);
+        let c = oc.scalar_prod(&oc) - self.r * self.r;
+        let d = h * h - a * c;
+        if d < 0.0 {
+            None
+        } else {
+            // we want smallest t, nearest to camera intersection
+            Some((h - f64::sqrt(d)) / a)
+        }
     }
 }

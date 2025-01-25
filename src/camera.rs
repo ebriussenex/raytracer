@@ -47,6 +47,6 @@ impl Camera {
 
     // px(0, 0), upper left pixel position
     pub fn upper_left_pixel_center(&self) -> Point {
-        self.vp_upper_left() + (self.px_dw + self.px_dh)
+        self.vp_upper_left() + (self.px_dw + self.px_dh) * 0.5
     }
 }
