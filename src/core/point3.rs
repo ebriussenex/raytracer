@@ -1,4 +1,4 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Point {
@@ -80,6 +80,16 @@ impl Div<f64> for Point {
     fn div(self, l: f64) -> Self::Output {
         Self {
             e: self.e.map(|x| x / l),
+        }
+    }
+}
+
+impl Neg for Point {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Point {
+            e: [-self.e[0], -self.e[1], -self.e[2]],
         }
     }
 }
