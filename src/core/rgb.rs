@@ -3,6 +3,7 @@ use std::{
     ops::{Add, Div, Mul},
 };
 
+#[derive(Clone, Copy)]
 pub struct Rgb {
     rgb: [f64; 3],
 }

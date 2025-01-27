@@ -18,7 +18,7 @@ fn main() {
     let img_width: u32 = 800;
     let ratio = 16.0 / 9.0;
 
-    let c = Camera::new(Point::new(0.0, 0.0, 0.0), img_width, ratio, 1.0);
+    let c = Camera::new(Point::new(0.0, 0.0, 0.0), img_width, ratio, 1.0, Some(10));
     let sphere_a: Rc<dyn Hittable> = Rc::new(Sphere::new(0.5, Point::new(0.0, 0.0, -1.0)));
     let sphere_b: Rc<dyn Hittable> = Rc::new(Sphere::new(100.0, Point::new(0.0, -100.5, -1.0)));
     let mut scene = Scene::default();
