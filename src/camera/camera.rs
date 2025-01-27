@@ -3,6 +3,7 @@ use std::io::{self, Write};
 use crate::{
     core::{point3::Point, ray::Ray, rgb::Rgb},
     scene::hittable::Scene,
+    utils::interval::Interval,
 };
 
 const VIEWPORT_HEIGHT: f64 = 2.0;
@@ -58,12 +59,12 @@ impl Camera {
     }
 
     // upper left of viewport, changes if camera pos is changed
-    pub fn vp_upper_left(&self) -> Point {
+    fn vp_upper_left(&self) -> Point {
         self.pos - Point::new(0.0, 0.0, self.focal_len) - (self.vpv_w + self.vpv_h) * 0.5
     }
 
     // px(0, 0), upper left pixel position, changes if camera pos is changed
-    pub fn upper_left_pixel_center(&self) -> Point {
+    fn upper_left_pixel_center(&self) -> Point {
         self.vp_upper_left() + (self.px_dw + self.px_dh) * 0.5
     }
 
@@ -88,7 +89,7 @@ impl Camera {
 }
 
 fn color(ray: &Ray, scene: &Scene) -> Rgb {
-    if let Some(rec) = scene.hit(ray, 0.0, f64::INFINITY) {
+    if let Some(rec) = scene.hit(ray, &Interval::new(0.0, f64::INFINITY)) {
         let n = rec.n;
         (Rgb::new(n.x(), n.y(), n.z()) + Rgb::new(1.0, 1.0, 1.0)) * 0.5
     } else {

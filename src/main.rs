@@ -1,6 +1,7 @@
 mod camera;
 mod core;
 mod scene;
+mod utils;
 
 use core::point3::Point;
 use std::rc::Rc;

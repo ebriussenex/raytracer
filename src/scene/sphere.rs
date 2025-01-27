@@ -1,4 +1,7 @@
-use crate::core::{point3::Point, ray::Ray};
+use crate::{
+    core::{point3::Point, ray::Ray},
+    utils::interval::Interval,
+};
 
 use super::hittable::{HitRec, Hittable};
 
@@ -18,7 +21,7 @@ impl Sphere {
 }
 
 impl Hittable for Sphere {
-    fn hit(&self, ray: &Ray, min_t: f64, max_t: f64) -> Option<super::hittable::HitRec> {
+    fn hit(&self, ray: &Ray, ray_t_possible: &Interval) -> Option<super::hittable::HitRec> {
         // temp vec for sphere center - origin of ray
         let oc = self.c - ray.orig();
         // quad equation
@@ -29,21 +32,21 @@ impl Hittable for Sphere {
         let c = oc.scalar_prod(&oc) - self.r * self.r;
         let d = h * h - a * c;
         if d < 0.0 {
-            return None;
+            None
         } else {
             // we want smallest t, nearest to camera intersection
             let sqrd = f64::sqrt(d);
             let mut t = (h - sqrd) / a;
-            if t < min_t {
+            if !ray_t_possible.surrounds(t) {
                 t = (h + sqrd) / a;
             }
 
-            if t > min_t && t < max_t {
+            if ray_t_possible.surrounds(t) {
                 let p = ray.at(t);
                 let n = (p - self.c) / self.r;
                 Some(HitRec::new(p, n, t))
             } else {
-                return None;
+                None
             }
         }
     }

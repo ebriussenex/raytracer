@@ -1,6 +1,9 @@
 use std::{default, rc::Rc};
 
-use crate::core::{point3::Point, ray::Ray};
+use crate::{
+    core::{point3::Point, ray::Ray},
+    utils::interval::Interval,
+};
 
 use assert_approx_eq::assert_approx_eq;
 
@@ -47,7 +50,7 @@ impl HitRec {
 }
 
 pub trait Hittable {
-    fn hit(&self, ray: &Ray, min_t: f64, max_t: f64) -> Option<HitRec>;
+    fn hit(&self, ray: &Ray, ray_t_possible: &Interval) -> Option<HitRec>;
 }
 
 #[derive(Default)]
@@ -60,11 +63,11 @@ impl Scene {
         self.objects.push(object);
     }
 
-    pub fn hit(&self, ray: &Ray, min_t: f64, max_t: f64) -> Option<HitRec> {
-        let mut cur_closest = max_t;
+    pub fn hit(&self, ray: &Ray, ray_t_possible: &Interval) -> Option<HitRec> {
+        let mut cur_closest = ray_t_possible.max();
         let mut res_hr = None;
         self.objects.iter().for_each(|ho| {
-            if let Some(hr) = ho.hit(ray, min_t, cur_closest) {
+            if let Some(hr) = ho.hit(ray, &Interval::new(ray_t_possible.min(), cur_closest)) {
                 cur_closest = hr.t;
                 res_hr = Some(hr);
             }
