@@ -29,7 +29,13 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn new(initial_pos: Point, img_width: u32, img_height: u32, focal_len: f64) -> Self {
+    pub fn new(initial_pos: Point, img_width: u32, ratio: f64, focal_len: f64) -> Self {
+        let img_height: u32 = if img_width as f64 / ratio < 1.0 {
+            1
+        } else {
+            (img_width as f64 / ratio) as u32
+        };
+
         // viewport, arbitrary size in virtual units
         let vp_w = VIEWPORT_HEIGHT * (img_width as f64 / img_height as f64);
         // viewport vectors
