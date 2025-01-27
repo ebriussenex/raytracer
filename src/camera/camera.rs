@@ -1,6 +1,16 @@
-use crate::core::point3::Point;
+use std::io::{self, Write};
+
+use crate::{
+    core::{point3::Point, ray::Ray, rgb::Rgb},
+    scene::hittable::Scene,
+};
 
 const VIEWPORT_HEIGHT: f64 = 2.0;
+
+pub enum RenderError {
+    WriteHeader(io::Error),
+    WritePx(io::Error),
+}
 
 // Camera represents abstraction over view on objects through pixel-viewport
 // upleft_px_pos, px00_pos thus depend on camera pos, those should be updated on each camera pos
@@ -12,8 +22,10 @@ pub struct Camera {
     focal_len: f64,
     vpv_h: Point,
     vpv_w: Point,
-    pub px_dw: Point,
-    pub px_dh: Point,
+    px_dw: Point,
+    px_dh: Point,
+    img_width: u32,
+    img_height: u32,
 }
 
 impl Camera {
@@ -34,20 +46,48 @@ impl Camera {
             vpv_h,
             px_dw,
             px_dh,
+            img_width,
+            img_height,
         }
     }
 
-    pub fn pos(&self) -> Point {
-        self.pos
-    }
-
-    // upper left of viewport
+    // upper left of viewport, changes if camera pos is changed
     pub fn vp_upper_left(&self) -> Point {
         self.pos - Point::new(0.0, 0.0, self.focal_len) - (self.vpv_w + self.vpv_h) * 0.5
     }
 
-    // px(0, 0), upper left pixel position
+    // px(0, 0), upper left pixel position, changes if camera pos is changed
     pub fn upper_left_pixel_center(&self) -> Point {
         self.vp_upper_left() + (self.px_dw + self.px_dh) * 0.5
+    }
+
+    pub fn render(&self, scene: &Scene) -> Result<(), RenderError> {
+        io::stdout()
+            .write_all(format!("P3\n{} {}\n255\n", self.img_width, self.img_height).as_bytes())
+            .map_err(RenderError::WriteHeader)?;
+
+        for j in 0..self.img_height {
+            for i in 0..self.img_width {
+                let px_center = self.upper_left_pixel_center()
+                    + (self.px_dw * i as f64)
+                    + (self.px_dh * j as f64);
+                let ray_dir = px_center - self.pos;
+                let ray = Ray::new(self.pos, ray_dir);
+                let px_color = color(&ray, scene);
+                px_color.write(io::stdout()).map_err(RenderError::WritePx)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn color(ray: &Ray, scene: &Scene) -> Rgb {
+    if let Some(rec) = scene.hit(ray, 0.0, f64::INFINITY) {
+        let n = rec.n;
+        (Rgb::new(n.x(), n.y(), n.z()) + Rgb::new(1.0, 1.0, 1.0)) * 0.5
+    } else {
+        let unit_dir = ray.dir().unit();
+        let a = 0.5 * (unit_dir.y() + 1.0);
+        Rgb::new(1.0, 1.0, 1.0) * (1.0 - a) + Rgb::new(0.5, 0.7, 1.0) * a
     }
 }

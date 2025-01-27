@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{default, rc::Rc};
 
 use crate::core::{point3::Point, ray::Ray};
 
@@ -38,10 +38,10 @@ impl HitRec {
         });
         self.n = if r.dir().scalar_prod(outward_normal) < 0.0 {
             self.face = NormalFace::Inside;
-            outward_normal.clone()
+            *outward_normal
         } else {
             self.face = NormalFace::Outside;
-            -outward_normal.clone()
+            -*outward_normal
         }
     }
 }
@@ -50,16 +50,9 @@ pub trait Hittable {
     fn hit(&self, ray: &Ray, min_t: f64, max_t: f64) -> Option<HitRec>;
 }
 
+#[derive(Default)]
 pub struct Scene {
     objects: Vec<Rc<dyn Hittable>>,
-}
-
-impl Default for Scene {
-    fn default() -> Self {
-        Self {
-            objects: Default::default(),
-        }
-    }
 }
 
 impl Scene {
