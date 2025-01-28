@@ -1,3 +1,4 @@
+#[derive(Clone, Copy)]
 pub struct Interval(f64, f64);
 
 pub const EMPTY: Interval = Interval(f64::INFINITY, f64::NEG_INFINITY);

@@ -3,7 +3,7 @@ use std::{
     io::{self, Write},
 };
 
-use rand::{rngs::ThreadRng, Rng};
+use rand::{distributions::Uniform, prelude::Distribution, rngs::ThreadRng};
 
 use crate::{
     core::{point3::Point, ray::Ray, rgb::Rgb},
@@ -12,6 +12,8 @@ use crate::{
 };
 
 const VIEWPORT_HEIGHT: f64 = 2.0;
+// maximum number of ray bounces into scene
+const MAX_RAY_BOUNCE: u32 = 10;
 
 pub enum RenderError {
     WriteHeader(io::Error),
@@ -26,20 +28,25 @@ struct AntiAliaser {
     // might be ok to remove rng logic in different struct later
     // later also might be useful to prepare random numbers, while in parallel doing other stuff
     rng: RefCell<ThreadRng>,
+    // NOTE:
+    // this usage of between makes some values of rng.gen (in retrace_to_random_near) to be prepared in compile time: https://docs.rs/rand_distr/latest/rand_distr/struct.Uniform.html
+    between: Uniform<f64>,
 }
 
 impl AntiAliaser {
     fn new(samples_per_pixel: u32) -> Self {
+        let rng = rand::thread_rng();
         AntiAliaser {
             samples_per_pixel,
             samples_scale: 1.0 / samples_per_pixel as f64,
-            rng: RefCell::new(rand::thread_rng()),
+            rng: RefCell::new(rng),
+            between: Uniform::from(-0.5..0.5),
         }
     }
 
     fn retrace_to_random_near(&self, wn: f64, hn: f64) -> (f64, f64) {
-        let mut brng = self.rng.borrow_mut();
-        let (w_offset, h_offset) = (brng.gen_range(-0.5..0.5), brng.gen_range(-0.5..0.5));
+        let brng = &mut *self.rng.borrow_mut();
+        let (w_offset, h_offset) = (self.between.sample(brng), self.between.sample(brng));
         (wn + w_offset, hn + h_offset)
     }
 }
@@ -126,11 +133,12 @@ impl Camera {
 
         for hn in 0..self.img_height {
             for wn in 0..self.img_width {
+                let max_depth = MAX_RAY_BOUNCE;
                 let mut px_color = Rgb::new(0.0, 0.0, 0.0);
                 if let Some(ref anti_aliaser) = &self.anti_aliaser {
                     for _ in 0..anti_aliaser.samples_per_pixel {
                         let r = self.ray_for(wn as f64, hn as f64);
-                        px_color = px_color + color(&r, scene);
+                        px_color = px_color + color(&r, scene, max_depth);
                     }
                     px_color = px_color * anti_aliaser.samples_scale;
                 } else {
@@ -139,7 +147,7 @@ impl Camera {
                         + (self.px_dh * hn as f64);
                     let ray_dir = px_center - self.pos;
                     let ray = Ray::new(self.pos, ray_dir);
-                    px_color = color(&ray, scene);
+                    px_color = color(&ray, scene, max_depth);
                 }
                 px_color.write(io::stdout()).map_err(RenderError::WritePx)?;
             }
@@ -148,10 +156,15 @@ impl Camera {
     }
 }
 
-fn color(ray: &Ray, scene: &Scene) -> Rgb {
-    if let Some(rec) = scene.hit(ray, &Interval::new(0.0, f64::INFINITY)) {
-        let n = rec.n;
-        (Rgb::new(n.x(), n.y(), n.z()) + Rgb::new(1.0, 1.0, 1.0)) * 0.5
+fn color(ray: &Ray, scene: &Scene, depth: u32) -> Rgb {
+    if depth == 0 {
+        return Rgb::new(0.0, 0.0, 0.0);
+    }
+
+    let mut rng = rand::thread_rng();
+    if let Some(rec) = scene.hit(ray, &Interval::new(0.001, f64::INFINITY)) {
+        let dir = Point::random_on_spec_hemisphere(&mut rng, &rec.n);
+        color(&Ray::new(rec.p, dir), scene, depth - 1) * 0.5
     } else {
         let unit_dir = ray.dir().unit();
         let a = 0.5 * (unit_dir.y() + 1.0);

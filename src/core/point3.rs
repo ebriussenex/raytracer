@@ -1,4 +1,8 @@
-use std::ops::{Add, Div, Mul, Neg, Sub};
+use std::ops::{Add, Div, Mul, Neg, Range, Sub};
+
+use rand::{rngs::ThreadRng, Rng};
+
+const MIN_FLOAT_64_PRECISION: f64 = 1e-160;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Point {
@@ -40,6 +44,48 @@ impl Point {
             self.squared_size()
         } else {
             self.x() * rhs.x() + self.y() * rhs.y() + self.z() * rhs.z()
+        }
+    }
+
+    fn random(rng: &mut ThreadRng) -> Self {
+        Point { e: rng.gen() }
+    }
+
+    fn random_with_interval(rng: &mut ThreadRng, range: Range<f64>) -> Self {
+        let x = rng.gen_range(range.clone());
+        let y = rng.gen_range(range.clone());
+        let z = rng.gen_range(range.clone());
+        Point { e: [x, y, z] }
+    }
+
+    // TODO:
+    // it's very inefficient, change it later
+    //
+    // random unit vector inside unit spehere,
+    // here imagine 1x1x1 surrounding cube, we try to
+    // find vector in cube which will be inside surrounded sphere
+    // and unit it, so it fit sphere radius
+    fn random_unit_sphere(rng: &mut ThreadRng) -> Self {
+        // TODO: add a to_stop_on val, which will make
+        // code return when we waiting too much on generating vectors
+        loop {
+            let p = Point::random_with_interval(rng, -1.0..1.0);
+            let sqlen = p.squared_size();
+            // to not get infinity 1e-160 is least for f64
+            if sqlen < 1.0 && sqlen > MIN_FLOAT_64_PRECISION {
+                return p / sqlen;
+            }
+        }
+    }
+
+    // we can use outwarding normal - if scalar production is > 0
+    // the random vector is on the "right" hemisphere
+    pub fn random_on_spec_hemisphere(rng: &mut ThreadRng, n: &Point) -> Point {
+        let on_unit_sphere = Point::random_unit_sphere(rng);
+        if on_unit_sphere.scalar_prod(n) > 0.0 {
+            on_unit_sphere
+        } else {
+            -on_unit_sphere
         }
     }
 }
