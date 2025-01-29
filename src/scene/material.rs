@@ -105,8 +105,17 @@ impl Material for Dielectric {
             NormalFace::Outside => 1.0 / self.refraction_index,
         };
         let unit_dir = r_in.dir().unit();
-        let refracted = refract(&unit_dir, &hr.n, refraction_index);
-        *scattered = Ray::new(hr.p, refracted);
+        let cos_theta = f64::min((-unit_dir).scalar_prod(&hr.n), 1.0);
+        let sin_theta = f64::sqrt(1.0 - cos_theta * cos_theta);
+        // NOTE: may be a little bit more optimal to use already calculated cos_theta,
+        // but code will be even more hard to read
+        let direction = if refraction_index * sin_theta > 1.0 {
+            reflect(&unit_dir, &hr.n)
+        } else {
+            refract(&unit_dir, &hr.n, refraction_index)
+        };
+
+        *scattered = Ray::new(hr.p, direction);
         true
     }
 }
@@ -114,10 +123,15 @@ impl Material for Dielectric {
 // snells law refraction with some math without proof
 fn refract(uv: &Point, n: &Point, etai_over_etat: f64) -> Point {
     let cos_theta = f64::min((-*uv).scalar_prod(n), 1.0);
+
     let r_out_perpendicular = (*uv + *n * cos_theta) * etai_over_etat;
     let r_out_parallel = *n
         * -f64::sqrt(f64::abs(
             1.0 - r_out_perpendicular.scalar_prod(&r_out_perpendicular),
         ));
     r_out_perpendicular + r_out_parallel
+}
+
+fn reflect(v: &Point, n: &Point) -> Point {
+    *v - *n * 2.0 * v.scalar_prod(n)
 }

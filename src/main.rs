@@ -23,7 +23,7 @@ fn main() {
 
     let mat_ground: Rc<dyn Material> = Rc::new(Lambertian::new(Rgb::new(0.8, 0.8, 0.1), 1.0));
     let mat_center: Rc<dyn Material> = Rc::new(Lambertian::new(Rgb::new(0.7, 0.2, 0.8), 1.0));
-    let mat_left: Rc<dyn Material> = Rc::new(Dielectric::new(1.5));
+    let mat_left: Rc<dyn Material> = Rc::new(Dielectric::new(1.0 / 1.33));
     let mat_right: Rc<dyn Material> = Rc::new(Metal::new(Rgb::new(0.8, 0.6, 0.2), Some(0.5)));
 
     let mut scene = Scene::default();

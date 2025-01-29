@@ -43,10 +43,10 @@ impl HitRec {
             true
         });
         self.n = if r.dir().scalar_prod(outward_normal) < 0.0 {
-            self.face = NormalFace::Inside;
+            self.face = NormalFace::Outside;
             *outward_normal
         } else {
-            self.face = NormalFace::Outside;
+            self.face = NormalFace::Inside;
             -*outward_normal
         }
     }
