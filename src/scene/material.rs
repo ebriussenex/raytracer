@@ -4,7 +4,7 @@ use rand::{distributions::Uniform, prelude::Distribution, rngs::ThreadRng};
 
 use crate::core::{point3::Point, ray::Ray, rgb::Rgb};
 
-use super::hittable::HitRec;
+use super::hittable::{HitRec, NormalFace};
 
 pub trait Material {
     fn scatter(
@@ -85,4 +85,39 @@ impl Material for Metal {
         *attenuation = self.albedo;
         self.fuzz.is_none() || scattered.dir().scalar_prod(&hr.n) > 0.0
     }
+}
+
+pub struct Dielectric {
+    refraction_index: f64,
+}
+
+impl Dielectric {
+    pub fn new(refraction_index: f64) -> Self {
+        Self { refraction_index }
+    }
+}
+
+impl Material for Dielectric {
+    fn scatter(&self, r_in: &Ray, attenuation: &mut Rgb, scattered: &mut Ray, hr: &HitRec) -> bool {
+        *attenuation = Rgb::new(1.0, 1.0, 1.0);
+        let refraction_index = match hr.face {
+            NormalFace::Inside => self.refraction_index,
+            NormalFace::Outside => 1.0 / self.refraction_index,
+        };
+        let unit_dir = r_in.dir().unit();
+        let refracted = refract(&unit_dir, &hr.n, refraction_index);
+        *scattered = Ray::new(hr.p, refracted);
+        true
+    }
+}
+
+// snells law refraction with some math without proof
+fn refract(uv: &Point, n: &Point, etai_over_etat: f64) -> Point {
+    let cos_theta = f64::min((-*uv).scalar_prod(n), 1.0);
+    let r_out_perpendicular = (*uv + *n * cos_theta) * etai_over_etat;
+    let r_out_parallel = *n
+        * -f64::sqrt(f64::abs(
+            1.0 - r_out_perpendicular.scalar_prod(&r_out_perpendicular),
+        ));
+    r_out_perpendicular + r_out_parallel
 }

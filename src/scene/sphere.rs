@@ -50,7 +50,10 @@ impl Hittable for Sphere {
             if ray_t_possible.surrounds(t) {
                 let p = ray.at(t);
                 let n = (p - self.c) / self.r;
-                Some(HitRec::new(p, n, t, Rc::clone(&self.mat)))
+
+                let mut hr = HitRec::new(p, n, t, Rc::clone(&self.mat));
+                hr.set_face_normal(ray, &n);
+                Some(hr)
             } else {
                 None
             }

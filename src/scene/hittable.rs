@@ -22,7 +22,6 @@ pub struct HitRec {
 pub enum NormalFace {
     Inside,
     Outside,
-    Unknown,
 }
 
 impl HitRec {
@@ -31,7 +30,7 @@ impl HitRec {
             p,
             n,
             t,
-            face: NormalFace::Unknown,
+            face: NormalFace::Inside,
             mat,
         }
     }
