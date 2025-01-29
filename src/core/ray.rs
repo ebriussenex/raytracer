@@ -1,5 +1,6 @@
-use super::{point3::Point, rgb::Rgb};
+use super::point3::Point;
 
+#[derive(Copy, Clone, Default)]
 pub struct Ray {
     orig: Point,
     dir: Point,

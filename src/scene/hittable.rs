@@ -1,4 +1,4 @@
-use std::{default, rc::Rc};
+use std::rc::Rc;
 
 use crate::{
     core::{point3::Point, ray::Ray},
@@ -7,12 +7,15 @@ use crate::{
 
 use assert_approx_eq::assert_approx_eq;
 
+use super::material::Material;
+
 pub struct HitRec {
     // point, normal vec and t as scalar of where hit happened
     pub p: Point,
     pub n: Point,
     pub t: f64,
     pub face: NormalFace,
+    pub mat: Rc<dyn Material>,
 }
 
 // where from happened ray hit, inside surface or outside
@@ -23,12 +26,13 @@ pub enum NormalFace {
 }
 
 impl HitRec {
-    pub fn new(p: Point, n: Point, t: f64) -> Self {
+    pub fn new(p: Point, n: Point, t: f64, mat: Rc<dyn Material>) -> Self {
         HitRec {
             p,
             n,
             t,
             face: NormalFace::Unknown,
+            mat,
         }
     }
     // We assume that every normal is in opposite direction to ray

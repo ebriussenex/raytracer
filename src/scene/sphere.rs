@@ -1,21 +1,27 @@
+use std::rc::Rc;
+
 use crate::{
     core::{point3::Point, ray::Ray},
     utils::interval::Interval,
 };
 
-use super::hittable::{HitRec, Hittable};
+use super::{
+    hittable::{HitRec, Hittable},
+    material::Material,
+};
 
-#[derive(Copy, Clone)]
 pub struct Sphere {
     r: f64,
     c: Point,
+    mat: Rc<dyn Material>,
 }
 
 impl Sphere {
-    pub fn new(r: f64, c: Point) -> Self {
+    pub fn new(r: f64, c: Point, mat: Rc<dyn Material>) -> Self {
         Sphere {
             r: f64::max(r, 0.0),
             c,
+            mat,
         }
     }
 }
@@ -44,7 +50,7 @@ impl Hittable for Sphere {
             if ray_t_possible.surrounds(t) {
                 let p = ray.at(t);
                 let n = (p - self.c) / self.r;
-                Some(HitRec::new(p, n, t))
+                Some(HitRec::new(p, n, t, Rc::clone(&self.mat)))
             } else {
                 None
             }

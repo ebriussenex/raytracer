@@ -3,7 +3,7 @@ use std::{
     ops::{Add, Div, Mul},
 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct Rgb {
     rgb: [f64; 3],
 }
@@ -44,6 +44,20 @@ impl Mul<f64> for Rgb {
     fn mul(self, l: f64) -> Self::Output {
         Self {
             rgb: self.rgb.map(|x| x * l),
+        }
+    }
+}
+
+impl Mul<Rgb> for Rgb {
+    type Output = Self;
+
+    fn mul(self, rhs: Rgb) -> Self::Output {
+        Self {
+            rgb: [
+                self.rgb[0] * rhs.rgb[0],
+                self.rgb[1] * rhs.rgb[1],
+                self.rgb[2] * rhs.rgb[2],
+            ],
         }
     }
 }

@@ -156,15 +156,23 @@ impl Camera {
     }
 }
 
+// it probably should be a scene method
 fn color(ray: &Ray, scene: &Scene, depth: u32) -> Rgb {
     if depth == 0 {
         return Rgb::new(0.0, 0.0, 0.0);
     }
 
-    let mut rng = rand::thread_rng();
-    if let Some(rec) = scene.hit(ray, &Interval::new(0.001, f64::INFINITY)) {
-        let dir = Point::random_on_spec_hemisphere(&mut rng, &rec.n);
-        color(&Ray::new(rec.p, dir), scene, depth - 1) * 0.5
+    // let rng = rand::thread_rng();
+    if let Some(ref mut rec) = scene.hit(ray, &Interval::new(0.001, f64::INFINITY)) {
+        let attenuation: &mut Rgb = &mut Default::default();
+        let scattered: &mut Ray = &mut Default::default();
+        if rec.mat.scatter(ray, attenuation, scattered, rec) {
+            *attenuation * color(scattered, scene, depth - 1)
+        } else {
+            Default::default()
+        }
+        //  let dir = Point::random_on_spec_hemisphere(&mut rng, &rec.n);
+        // color(&Ray::new(rec.p, dir), scene, depth - 1) * 0.5
     } else {
         let unit_dir = ray.dir().unit();
         let a = 0.5 * (unit_dir.y() + 1.0);

@@ -3,8 +3,9 @@ use std::ops::{Add, Div, Mul, Neg, Range, Sub};
 use rand::{rngs::ThreadRng, Rng};
 
 const MIN_FLOAT_64_PRECISION: f64 = 1e-160;
+const ALMOST_ZERO: f64 = 1e-8;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Default)]
 pub struct Point {
     e: [f64; 3],
 }
@@ -54,7 +55,7 @@ impl Point {
     fn random_with_interval(rng: &mut ThreadRng, range: Range<f64>) -> Self {
         let x = rng.gen_range(range.clone());
         let y = rng.gen_range(range.clone());
-        let z = rng.gen_range(range.clone());
+        let z = rng.gen_range(range);
         Point { e: [x, y, z] }
     }
 
@@ -65,7 +66,7 @@ impl Point {
     // here imagine 1x1x1 surrounding cube, we try to
     // find vector in cube which will be inside surrounded sphere
     // and unit it, so it fit sphere radius
-    fn random_unit_sphere(rng: &mut ThreadRng) -> Self {
+    pub fn random_unit_sphere(rng: &mut ThreadRng) -> Self {
         // TODO: add a to_stop_on val, which will make
         // code return when we waiting too much on generating vectors
         loop {
@@ -87,6 +88,14 @@ impl Point {
         } else {
             -on_unit_sphere
         }
+    }
+
+    pub fn near_zero(&self) -> bool {
+        self.e.iter().all(|x| x.abs() < ALMOST_ZERO)
+    }
+
+    pub fn reflect(&self, n: &Point) -> Point {
+        *self - *n * 2.0 * self.scalar_prod(n)
     }
 }
 
