@@ -48,8 +48,25 @@ impl Point {
         }
     }
 
+    pub fn cross(&self, rhs: &Point) -> Point {
+        Point {
+            e: [
+                self.e[1] * rhs.e[2] - self.e[2] * rhs.e[1],
+                self.e[2] * rhs.e[0] - self.e[0] * rhs.e[2],
+                self.e[0] * rhs.e[1] - self.e[1] * rhs.e[0],
+            ],
+        }
+    }
+
     fn random(rng: &mut ThreadRng) -> Self {
-        Point { e: rng.gen() }
+        let range = 0.0..0.1;
+        Point {
+            e: [
+                rng.gen_range(range.clone()),
+                rng.gen_range(range.clone()),
+                rng.gen_range(range),
+            ],
+        }
     }
 
     fn random_with_interval(rng: &mut ThreadRng, range: Range<f64>) -> Self {
@@ -66,7 +83,7 @@ impl Point {
     // here imagine 1x1x1 surrounding cube, we try to
     // find vector in cube which will be inside surrounded sphere
     // and unit it, so it fit sphere radius
-    pub fn random_unit_sphere(rng: &mut ThreadRng) -> Self {
+    pub fn random_unit_on_sphere(rng: &mut ThreadRng) -> Self {
         // TODO: add a to_stop_on val, which will make
         // code return when we waiting too much on generating vectors
         loop {
@@ -82,7 +99,7 @@ impl Point {
     // we can use outwarding normal - if scalar production is > 0
     // the random vector is on the "right" hemisphere
     pub fn random_on_spec_hemisphere(rng: &mut ThreadRng, n: &Point) -> Point {
-        let on_unit_sphere = Point::random_unit_sphere(rng);
+        let on_unit_sphere = Point::random_unit_on_sphere(rng);
         if on_unit_sphere.scalar_prod(n) > 0.0 {
             on_unit_sphere
         } else {

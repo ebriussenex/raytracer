@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use rand::{distributions::Uniform, prelude::Distribution, rngs::ThreadRng};
+use rand::{distributions::Uniform, prelude::Distribution, rngs::ThreadRng, Rng};
 
 use crate::core::{point3::Point, ray::Ray, rgb::Rgb};
 
@@ -45,7 +45,7 @@ impl Material for Lambertian {
         hr: &HitRec,
     ) -> bool {
         if self.between.sample(&mut *self.rng.borrow_mut()) < self.reflectance {
-            let mut scatter_dir = hr.n + Point::random_unit_sphere(&mut self.rng.borrow_mut());
+            let mut scatter_dir = hr.n + Point::random_unit_on_sphere(&mut self.rng.borrow_mut());
             // we need to avoid zero scatter direction due to possibility of
             // later getting NaNs and infinities. It may happen when randomly generated vector
             // is opposite to normal vector.
@@ -79,7 +79,7 @@ impl Material for Metal {
         let mut reflected = r_in.dir().reflect(&hr.n);
         if let Some(fuzz) = self.fuzz {
             let mut rng = rand::thread_rng();
-            reflected = reflected.unit() + (Point::random_unit_sphere(&mut rng) * fuzz)
+            reflected = reflected.unit() + (Point::random_unit_on_sphere(&mut rng) * fuzz)
         }
         *scattered = Ray::new(hr.p, reflected);
         *attenuation = self.albedo;
@@ -109,7 +109,10 @@ impl Material for Dielectric {
         let sin_theta = f64::sqrt(1.0 - cos_theta * cos_theta);
         // NOTE: may be a little bit more optimal to use already calculated cos_theta,
         // but code will be even more hard to read
-        let direction = if refraction_index * sin_theta > 1.0 {
+        let mut rng = rand::thread_rng();
+        let direction = if refraction_index * sin_theta > 1.0
+            || reflectance(cos_theta, refraction_index) > rng.gen_range(0.0..1.0)
+        {
             reflect(&unit_dir, &hr.n)
         } else {
             refract(&unit_dir, &hr.n, refraction_index)
@@ -134,4 +137,11 @@ fn refract(uv: &Point, n: &Point, etai_over_etat: f64) -> Point {
 
 fn reflect(v: &Point, n: &Point) -> Point {
     *v - *n * 2.0 * v.scalar_prod(n)
+}
+
+// shlick's approximation
+fn reflectance(cos: f64, refraction_index: f64) -> f64 {
+    let r0 = (1.0 - refraction_index) / (1.0 + refraction_index);
+    let r0 = r0 * r0;
+    r0 + (1.0 - r0) * f64::powi(1.0 - cos, 5)
 }

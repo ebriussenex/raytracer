@@ -1,5 +1,6 @@
 use std::{
     cell::RefCell,
+    f64::consts::PI,
     io::{self, Write},
 };
 
@@ -11,7 +12,6 @@ use crate::{
     utils::interval::Interval,
 };
 
-const VIEWPORT_HEIGHT: f64 = 2.0;
 // maximum number of ray bounces into scene
 const MAX_RAY_BOUNCE: u32 = 10;
 
@@ -51,6 +51,14 @@ impl AntiAliaser {
     }
 }
 
+// orthonormal basis, right hand
+// v - up; w - opposite to "view at"; u - camera right
+struct Basis {
+    pub u: Point,
+    pub v: Point,
+    pub w: Point,
+}
+
 // Camera represents abstraction over view on objects through pixel-viewport
 // upleft_px_pos, px00_pos thus depend on camera pos, those should be updated on each camera pos
 // changes.
@@ -66,33 +74,50 @@ pub struct Camera {
     img_width: u32,
     img_height: u32,
     anti_aliaser: Option<AntiAliaser>,
+    vfov: f64,
+    lookat: Point,
+    b: Basis,
 }
 
 impl Camera {
     pub fn new(
-        initial_pos: Point,
+        lookfrom: Option<Point>,
+        lookat: Option<Point>,
+        vup: Option<Point>,
         img_width: u32,
         ratio: f64,
-        focal_len: f64,
         aa_samples_per_px: Option<u32>,
+        vfov: f64,
     ) -> Self {
+        let lookfrom = lookfrom.unwrap_or(Point::default());
+        let lookat = lookat.unwrap_or(Point::new(0.0, 0.0, -1.0));
+        let vup = vup.unwrap_or(Point::new(0.0, 1.0, 0.0));
+        let focal_len = (lookfrom - lookat).size();
         let img_height: u32 = if img_width as f64 / ratio < 1.0 {
             1
         } else {
             (img_width as f64 / ratio) as u32
         };
 
+        let h = f64::tan(vfov / 2.0);
+        let vp_height = 2.0 * h * focal_len;
+
         // viewport, arbitrary size in virtual units
-        let vp_w = VIEWPORT_HEIGHT * (img_width as f64 / img_height as f64);
+        let vp_w = vp_height * (img_width as f64 / img_height as f64);
+
+        let w = (lookfrom - lookat).unit();
+        let u = vup.cross(&w);
+        let v = w.cross(&u);
         // viewport vectors
-        let vpv_h = Point::new(0.0, -VIEWPORT_HEIGHT, 0.0);
-        let vpv_w = Point::new(vp_w, 0.0, 0.0);
+        let vpv_h = -v * vp_height;
+        let vpv_w = u * vp_w;
 
         // pixel spacing, pixel delta
         let px_dw = vpv_w / img_width as f64;
         let px_dh = vpv_h / img_height as f64;
         Camera {
-            pos: initial_pos,
+            lookat,
+            pos: lookfrom,
             focal_len,
             vpv_w,
             vpv_h,
@@ -101,12 +126,14 @@ impl Camera {
             img_width,
             img_height,
             anti_aliaser: aa_samples_per_px.map(AntiAliaser::new),
+            vfov,
+            b: Basis { u, v, w },
         }
     }
 
     // upper left of viewport, changes if camera pos is changed
     fn vp_upper_left(&self) -> Point {
-        self.pos - Point::new(0.0, 0.0, self.focal_len) - (self.vpv_w + self.vpv_h) * 0.5
+        self.pos - self.b.w * self.focal_len - (self.vpv_w + self.vpv_h) * 0.5
     }
 
     // px(0, 0), upper left pixel position, changes if camera pos is changed
