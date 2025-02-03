@@ -1,7 +1,9 @@
 use std::{
     io::{Result, Write},
-    ops::{Add, Div, Mul},
+    ops::{Add, Div, Mul, RangeInclusive},
 };
+
+use rand::Rng;
 
 #[derive(Clone, Copy, Default)]
 pub struct Rgb {
@@ -35,6 +37,24 @@ impl Rgb {
     pub fn write(&self, mut stream: impl Write) -> Result<()> {
         stream.write_all(self.to_string().as_bytes())?;
         Ok(())
+    }
+
+    pub fn random(rng: &mut impl Rng) -> Self {
+        let range = 0.0..1.0;
+        Self {
+            rgb: [
+                rng.random_range(range.clone()),
+                rng.random_range(range.clone()),
+                rng.random_range(range),
+            ],
+        }
+    }
+
+    pub fn random_with_interval(rng: &mut impl Rng, range: RangeInclusive<f64>) -> Self {
+        let x = rng.random_range(range.clone());
+        let y = rng.random_range(range.clone());
+        let z = rng.random_range(range);
+        Self { rgb: [x, y, z] }
     }
 }
 

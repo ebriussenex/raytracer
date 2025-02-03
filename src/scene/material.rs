@@ -1,8 +1,17 @@
 use std::cell::RefCell;
 
-use rand::{distributions::Uniform, prelude::Distribution, rngs::ThreadRng, Rng};
+use rand::{
+    distr::{uniform, Uniform},
+    prelude::Distribution,
+    rngs::ThreadRng,
+    Rng,
+};
 
-use crate::core::{point3::Point, ray::Ray, rgb::Rgb};
+use crate::core::{
+    point3::{Point, MIN_FLOAT_64_PRECISION},
+    ray::Ray,
+    rgb::Rgb,
+};
 
 use super::hittable::{HitRec, NormalFace};
 
@@ -27,11 +36,14 @@ pub struct Lambertian {
 
 impl Lambertian {
     pub fn new(albedo: Rgb, reflectance: f64) -> Self {
+        let between = Uniform::new(0.0, 1.0 + MIN_FLOAT_64_PRECISION)
+            .expect("constants should not cause panic in any universe");
+
         Lambertian {
             albedo,
             reflectance,
-            rng: RefCell::new(rand::thread_rng()),
-            between: Uniform::new(0.0, 1.0),
+            rng: RefCell::new(rand::rng()),
+            between,
         }
     }
 }
@@ -78,7 +90,7 @@ impl Material for Metal {
     fn scatter(&self, r_in: &Ray, attenuation: &mut Rgb, scattered: &mut Ray, hr: &HitRec) -> bool {
         let mut reflected = r_in.dir().reflect(&hr.n);
         if let Some(fuzz) = self.fuzz {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             reflected = reflected.unit() + (Point::random_unit_on_sphere(&mut rng) * fuzz)
         }
         *scattered = Ray::new(hr.p, reflected);
@@ -109,7 +121,7 @@ impl Material for Dielectric {
         let sin_theta = f64::sqrt(1.0 - cos_theta * cos_theta);
         // NOTE: may be a little bit more optimal to use already calculated cos_theta,
         // but code will be even more hard to read
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let direction = if refraction_index * sin_theta > 1.0
             || reflectance(cos_theta, refraction_index) > rng.gen_range(0.0..1.0)
         {
