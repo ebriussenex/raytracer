@@ -1,11 +1,6 @@
 use std::cell::RefCell;
 
-use rand::{
-    distr::{uniform, Uniform},
-    prelude::Distribution,
-    rngs::ThreadRng,
-    Rng,
-};
+use rand::{distr::Uniform, prelude::Distribution, rngs::ThreadRng, Rng};
 
 use crate::core::{
     point3::{Point, MIN_FLOAT_64_PRECISION},
@@ -91,7 +86,7 @@ impl Material for Metal {
         let mut reflected = r_in.dir().reflect(&hr.n);
         if let Some(fuzz) = self.fuzz {
             let mut rng = rand::rng();
-            reflected = reflected.unit() + (Point::random_unit_on_sphere(&mut rng) * fuzz)
+            reflected = reflected.unit() + (Point::random_unit_on_sphere(&mut rng) * fuzz);
         }
         *scattered = Ray::new(hr.p, reflected);
         *attenuation = self.albedo;
@@ -123,7 +118,7 @@ impl Material for Dielectric {
         // but code will be even more hard to read
         let mut rng = rand::rng();
         let direction = if refraction_index * sin_theta > 1.0
-            || reflectance(cos_theta, refraction_index) > rng.gen_range(0.0..1.0)
+            || reflectance(cos_theta, refraction_index) > rng.random::<f64>()
         {
             reflect(&unit_dir, &hr.n)
         } else {

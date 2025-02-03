@@ -5,6 +5,8 @@ use std::{
 
 use rand::Rng;
 
+use crate::utils::math::safe_f64_to_u8_clamp;
+
 #[derive(Clone, Copy, Default)]
 pub struct Rgb {
     rgb: [f64; 3],
@@ -24,7 +26,7 @@ impl std::fmt::Display for Rgb {
         let u8r = self
             .rgb
             .map(linear_to_gamma)
-            .map(|x| (x * 255.999).clamp(0.0, 256.0).round() as u8);
+            .map(|x| safe_f64_to_u8_clamp(x * 255.999).expect("f64 is nan!"));
         writeln!(f, "{} {} {}", u8r[0], u8r[1], u8r[2])
     }
 }

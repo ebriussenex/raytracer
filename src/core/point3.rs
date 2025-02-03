@@ -1,6 +1,9 @@
-use std::ops::{Add, Div, Mul, Neg, Range, RangeInclusive, Sub};
+use std::{
+    f64::consts::TAU,
+    ops::{Add, Div, Mul, Neg, RangeInclusive, Sub},
+};
 
-use rand::Rng;
+use rand::{distr::StandardUniform, Rng};
 
 pub const MIN_FLOAT_64_PRECISION: f64 = 1e-160;
 const ALMOST_ZERO: f64 = 1e-8;
@@ -76,24 +79,11 @@ impl Point {
         Point { e: [x, y, z] }
     }
 
-    // TODO:
-    // it's very inefficient, change it later
-    //
-    // random unit vector inside unit spehere,
-    // here imagine 1x1x1 surrounding cube, we try to
-    // find vector in cube which will be inside surrounded sphere
-    // and unit it, so it fit sphere radius
     pub fn random_unit_on_sphere(rng: &mut impl Rng) -> Self {
-        // TODO: add a to_stop_on val, which will make
-        // code return when we waiting too much on generating vectors
-        loop {
-            let p = Point::random_with_interval(rng, -1.0..=1.0);
-            let sqlen = p.squared_size();
-            // to not get infinity 1e-160 is least for f64
-            if sqlen < 1.0 && sqlen > MIN_FLOAT_64_PRECISION {
-                break p * sqlen.recip();
-            }
-        }
+        let x = rng.sample(StandardUniform);
+        let y = rng.sample(StandardUniform);
+        let z = rng.sample(StandardUniform);
+        Point::new(x, y, z).unit()
     }
 
     // we can use outwarding normal - if scalar production is > 0
@@ -108,17 +98,9 @@ impl Point {
     }
 
     pub fn random_on_unit_disk(rng: &mut impl Rng) -> Self {
-        loop {
-            let p = Point::new(
-                rng.random_range(-1.0..1.0),
-                rng.random_range(-1.0..1.0),
-                0.0,
-            );
-            let sqlen = p.squared_size();
-            if sqlen < 1.0 {
-                break p;
-            }
-        }
+        let r = rng.random::<f64>().sqrt();
+        let theta = rng.random_range(0.0..TAU);
+        Point::new(r * theta.cos(), r * theta.sin(), 0.0)
     }
 
     pub fn near_zero(&self) -> bool {

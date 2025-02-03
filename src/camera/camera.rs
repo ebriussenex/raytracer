@@ -13,17 +13,10 @@ use rand::{
 use rand_xoshiro::{rand_core::SeedableRng, Xoshiro256PlusPlus};
 
 use crate::{
-    core::{
-        point3::{Point, MIN_FLOAT_64_PRECISION},
-        ray::Ray,
-        rgb::Rgb,
-    },
+    core::{point3::Point, ray::Ray, rgb::Rgb},
     scene::hittable::Scene,
-    utils::interval::Interval,
+    utils::{interval::Interval, math::f64_to_u32},
 };
-
-// maximum number of ray bounces into scene
-const MAX_RAY_BOUNCE: u32 = 50;
 
 pub enum RenderError {
     WriteHeader(io::Error),
@@ -54,21 +47,23 @@ impl AntiAliaser {
         let between = Uniform::new(-0.5, 0.5)?;
         Ok(AntiAliaser {
             samples_per_pixel,
-            samples_scale: 1.0 / samples_per_pixel as f64,
+            samples_scale: 1.0 / f64::from(samples_per_pixel),
             rng: RefCell::new(rng),
             between,
         })
     }
 
-    fn retrace_to_random_near(&self, wn: f64, hn: f64) -> (f64, f64) {
+    fn retrace_offset(&self) -> (f64, f64) {
         let brng = &mut *self.rng.borrow_mut();
         let (w_offset, h_offset) = (self.between.sample(brng), self.between.sample(brng));
-        (wn + w_offset, hn + h_offset)
+        (w_offset, h_offset)
     }
 }
 
 // orthonormal basis, right hand
 // v - up; w - opposite to "view at"; u - camera right
+// we allow dead_code here due to better correctnes - basis in 3d space should contain 3 elements
+#[allow(dead_code)]
 struct Basis {
     pub u: Point,
     pub v: Point,
@@ -100,18 +95,17 @@ impl Defocuser {
 // px_dw, px_dh is constant after creation of camera, while those depend on chosen arbitrary
 // viewport size.
 pub struct Camera {
-    pos: Point,
-    vpv_h: Point,
-    vpv_w: Point,
-    px_dw: Point,
-    px_dh: Point,
+    lookfrom: Point,
+    px_du: Point,
+    px_dv: Point,
     img_width: u32,
     img_height: u32,
+    vp_upper_left: Point,
+    px00_loc: Point,
     anti_aliaser: Option<AntiAliaser>,
-    basis: Basis,
     // TODO: make defocus optional
     defocus: Defocuser,
-    focus_dist: f64,
+    max_bounce_depth: u32,
 }
 
 impl Camera {
@@ -125,6 +119,7 @@ impl Camera {
         vfov: Option<f64>,
         focus_dist: Option<f64>,
         defocus_angle: Option<f64>,
+        max_bounce_depth: Option<u32>,
     ) -> Result<Self, InitError> {
         let lookfrom = lookfrom.unwrap_or_default();
         let lookat = lookat.unwrap_or(Point::new(0.0, 0.0, -1.0));
@@ -140,29 +135,35 @@ impl Camera {
             Some(aa_samples_per_px.unwrap_or(100))
         };
 
-        let img_height: u32 = if img_width as f64 / ratio < 1.0 {
+        let max_bounce_depth = max_bounce_depth.unwrap_or(10);
+
+        let img_height: u32 = if f64::from(img_width) / ratio < 1.0 {
             1
         } else {
-            (img_width as f64 / ratio) as u32
+            f64_to_u32(f64::from(img_width) / ratio).expect("img height in pixels should fit u32")
         };
 
         let h = f64::tan(vfov / 2.0);
         let vp_height = 2.0 * h * focus_dist;
 
         // viewport, arbitrary size in virtual units
-        let vp_width = vp_height * (img_width as f64 / img_height as f64);
+        let vp_width = vp_height * (f64::from(img_width) / f64::from(img_height));
 
         let w = (lookfrom - lookat).unit();
-        let u = vup.cross(&w).unit();
-        let v = w.cross(&u).unit();
+        let u = vup.cross(&w);
+        let v = w.cross(&u);
         let basis = Basis { u, v, w };
         // viewport vectors
-        let vpv_h = -v * vp_height;
-        let vpv_w = u * vp_width;
+        let vp_v = -v * vp_height;
+        let vp_u = u * vp_width;
 
         // pixel spacing, pixel delta
-        let px_dw = vpv_w / img_width as f64;
-        let px_dh = vpv_h / img_height as f64;
+        let px_du = vp_u / f64::from(img_width);
+        let px_dv = vp_v / f64::from(img_height);
+
+        // location of 1st 0,0 px in vieport
+        let vp_upper_left = lookfrom - (w * focus_dist) - (vp_u + vp_v) * 0.5;
+        let px00_loc = vp_upper_left + (px_dv + px_du) * 0.5;
 
         // bluring - defocus radius
         let defocus_radius = focus_dist * f64::tan(defocus_angle / 2.0);
@@ -176,46 +177,38 @@ impl Camera {
             .transpose()?;
 
         Ok(Camera {
-            pos: lookfrom,
-            vpv_w,
-            vpv_h,
-            px_dw,
-            px_dh,
+            lookfrom,
+            px_du,
+            px_dv,
             img_width,
             img_height,
+            vp_upper_left,
+            px00_loc,
             anti_aliaser,
-            basis,
             defocus,
-            focus_dist,
+            max_bounce_depth,
         })
-    }
-
-    // upper left of viewport, changes if camera pos is changed
-    fn vp_upper_left(&self) -> Point {
-        self.pos - self.basis.w * self.focus_dist - (self.vpv_w + self.vpv_h) * 0.5
-    }
-
-    // px(0, 0), upper left pixel position, changes if camera pos is changed
-    fn upper_left_pixel_center(&self) -> Point {
-        self.vp_upper_left() + (self.px_dw + self.px_dh) * 0.5
     }
 
     // ray for pixel width number and height number
     fn ray_for(&self, wn: f64, hn: f64) -> Ray {
         // construct from the defocus disk and direct at randomly sampled point arount pixel
         // location wn,hn
-        let (mut wn, mut hn) = (wn, hn);
+        let (mut w_offset, mut h_offset) = (0.0, 0.0);
+
         if let Some(ref anti_aliaser) = &self.anti_aliaser {
-            (wn, hn) = anti_aliaser.retrace_to_random_near(wn, hn);
+            (w_offset, h_offset) = anti_aliaser.retrace_offset();
         }
+        let px_sample =
+            self.px00_loc + (self.px_du * (wn + w_offset)) + (self.px_dv * (hn + h_offset));
+
         let ray_orig = if self.defocus.angle <= 0.0 {
-            self.pos
+            self.lookfrom
         } else {
             self.defocus_disk_sample(&mut *self.defocus.rng.borrow_mut())
         };
 
-        let px_center = self.upper_left_pixel_center() + (self.px_dw * wn) + (self.px_dh * hn);
-        let ray_dir = px_center - self.pos;
+        let ray_dir = px_sample - ray_orig;
         Ray::new(ray_orig, ray_dir)
     }
 
@@ -226,20 +219,20 @@ impl Camera {
 
         for hn in 0..self.img_height {
             for wn in 0..self.img_width {
-                let max_depth = MAX_RAY_BOUNCE;
+                let max_depth = self.max_bounce_depth;
                 let mut px_color = Rgb::default();
                 if let Some(ref anti_aliaser) = &self.anti_aliaser {
                     for _ in 0..anti_aliaser.samples_per_pixel {
-                        let r = self.ray_for(wn as f64, hn as f64);
+                        let r = self.ray_for(f64::from(wn), f64::from(hn));
                         px_color = px_color + color(&r, scene, max_depth);
                     }
                     px_color = px_color * anti_aliaser.samples_scale;
                 } else {
-                    let px_center = self.upper_left_pixel_center()
-                        + (self.px_dw * wn as f64)
-                        + (self.px_dh * hn as f64);
-                    let ray_dir = px_center - self.pos;
-                    let ray = Ray::new(self.pos, ray_dir);
+                    let px_center = self.vp_upper_left
+                        + (self.px_du * f64::from(wn))
+                        + (self.px_dv * f64::from(hn));
+                    let ray_dir = px_center - self.lookfrom;
+                    let ray = Ray::new(self.lookfrom, ray_dir);
                     px_color = color(&ray, scene, max_depth);
                 }
                 px_color.write(io::stdout()).map_err(RenderError::WritePx)?;
@@ -250,7 +243,7 @@ impl Camera {
 
     fn defocus_disk_sample(&self, rng: &mut impl Rng) -> Point {
         let p = Point::random_on_unit_disk(rng);
-        self.pos + (self.defocus.disk_u_r * p.x()) + (self.defocus.disk_v_r * p.y())
+        self.lookfrom + (self.defocus.disk_u_r * p.x()) + (self.defocus.disk_v_r * p.y())
     }
 }
 
@@ -261,12 +254,12 @@ fn color(ray: &Ray, scene: &Scene, depth: u32) -> Rgb {
     }
 
     if let Some(ref mut rec) = scene.hit(ray, &Interval::new(0.001, f64::INFINITY)) {
-        let attenuation: &mut Rgb = &mut Default::default();
-        let scattered: &mut Ray = &mut Default::default();
+        let attenuation = &mut Rgb::default();
+        let scattered = &mut Ray::default();
         if rec.mat.scatter(ray, attenuation, scattered, rec) {
             *attenuation * color(scattered, scene, depth - 1)
         } else {
-            Default::default()
+            Rgb::default()
         }
     } else {
         let unit_dir = ray.dir().unit();

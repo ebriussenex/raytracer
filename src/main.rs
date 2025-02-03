@@ -17,23 +17,30 @@ use scene::{
 use crate::camera::camera::Camera;
 
 fn main() {
-    let img_width: u32 = 900;
+    let img_width: u32 = 1920;
     let ratio = 16.0 / 9.0;
     let lookfrom = Point::new(13.0, 2.0, 3.0);
     let _lookfrom = Point::default();
     let lookat = Point::new(0.0, 0.0, 0.0);
+    let _lookat = Point::new(0.0, 0.0, -1.0);
     let vup = Point::new(0.0, 1.0, 0.0);
+    let ray_bounce_depth: u32 = 50;
+    let vfov = 20.0_f64.to_radians();
+    let aa_samples_per_px = Some(500);
+    let defocus_angle = 0.6_f64.to_radians();
+    let focus_dist = 10.0;
 
     let c = Camera::build(
         Some(lookfrom),
         Some(lookat),
-        Some(vup),
+        Some(vup.unit()),
         img_width,
         ratio,
-        Some(50),
-        Some(20.0_f64.to_radians()),
-        Some(4.0),
-        Some(0.6_f64.to_radians()),
+        aa_samples_per_px,
+        Some(vfov),
+        Some(focus_dist),
+        Some(defocus_angle),
+        Some(ray_bounce_depth),
     );
 
     let c = match c {
@@ -52,15 +59,15 @@ fn main() {
         }
     };
 
-    let R = f64::cos(PI / 4.0);
+    let r = f64::cos(PI / 4.0);
     let lambert1: Rc<dyn Material> = Rc::new(Lambertian::new(Rgb::new(1.0, 1.0, 0.0), 1.0));
     let lambert2: Rc<dyn Material> = Rc::new(Lambertian::new(Rgb::new(0.0, 1.0, 1.0), 1.0));
 
     let mut scene2 = Scene::default();
 
     [
-        Sphere::new(R, Point::new(-R, 0.0, -1.0), lambert1),
-        Sphere::new(R, Point::new(R, 0.0, -1.0), lambert2),
+        Sphere::new(r, Point::new(-r, 0.0, -1.0), lambert1),
+        Sphere::new(r, Point::new(r, 0.0, -1.0), lambert2),
     ]
     .into_iter()
     .map(|x| Rc::new(x) as Rc<dyn Hittable>)
@@ -75,10 +82,10 @@ fn main() {
     let mut scene = Scene::default();
 
     [
-        Sphere::new(100.0, Point::new(0.0, -100.5, -1.0), mat_ground),
+        Sphere::new(100.0, Point::new(0.0, -100.5, -1.0), mat_ground.clone()),
         Sphere::new(0.5, Point::new(0.0, 0.0, -3.2), mat_center.clone()),
-        Sphere::new(0.5, Point::new(-1.0, 0.0, -2.5), mat_left),
-        Sphere::new(0.3, Point::new(-1.0, 0.0, -2.5), mat_left_bubble),
+        Sphere::new(0.5, Point::new(-1.0, 0.0, -2.5), mat_left.clone()),
+        Sphere::new(0.3, Point::new(-1.0, 0.0, -2.5), mat_left_bubble.clone()),
         Sphere::new(0.4, Point::new(1.0, 0.0, -1.0), mat_right.clone()),
         Sphere::new(0.4, Point::new(6.0, 0.0, -10.0), mat_right.clone()),
         Sphere::new(0.5, Point::new(-3.0, 0.0, -1.6), mat_center.clone()),
@@ -86,6 +93,20 @@ fn main() {
     .into_iter()
     .map(|x| Rc::new(x) as Rc<dyn Hittable>)
     .for_each(|x| scene.add(x));
+
+    let mut blur_scene = Scene::default();
+    [
+        Sphere::new(100.0, Point::new(0.0, -100.5, -1.0), mat_ground.clone()),
+        Sphere::new(0.5, Point::new(0.0, 0.0, -1.2), mat_center.clone()),
+        Sphere::new(0.5, Point::new(-1.0, 0.0, -1.0), mat_left.clone()),
+        Sphere::new(0.3, Point::new(-1.0, 0.0, -1.0), mat_left_bubble.clone()),
+        Sphere::new(0.4, Point::new(1.0, 0.0, -1.0), mat_right.clone()),
+        Sphere::new(0.4, Point::new(6.0, 0.0, -10.0), mat_right.clone()),
+        Sphere::new(0.5, Point::new(-3.0, 0.0, -1.6), mat_center.clone()),
+    ]
+    .into_iter()
+    .map(|x| Rc::new(x) as Rc<dyn Hittable>)
+    .for_each(|x| blur_scene.add(x));
 
     let scene3 = prepare_scene();
 
@@ -101,7 +122,8 @@ fn main() {
 fn prepare_scene() -> Scene {
     let mut scene = Scene::default();
 
-    let ground_material: Rc<dyn Material> = Rc::new(Lambertian::new(Rgb::new(0.7, 0.4, 0.4), 1.0));
+    let ground_material: Rc<dyn Material> =
+        Rc::new(Lambertian::new(Rgb::new(0.51, 0.68, 0.46), 1.0));
     let ground_sphere: Rc<dyn Hittable> = Rc::new(Sphere::new(
         1000.0,
         Point::new(0.0, -1000.0, 0.0),
@@ -113,9 +135,9 @@ fn prepare_scene() -> Scene {
             let mut rng = rand::rng();
             let choose_mat = rng.random_range(0.0..=1.0);
             let center = Point::new(
-                a as f64 + 0.9 * rng.random_range(0.0..=1.0),
+                f64::from(a) + 0.9 * rng.random_range(0.0..=1.0),
                 0.2,
-                b as f64 + 0.9 * rng.random_range(0.0..=1.0),
+                f64::from(b) + 0.9 * rng.random_range(0.0..=1.0),
             );
 
             let glass_mat: Rc<dyn Material> = Rc::new(Dielectric::new(1.5));
