@@ -5,17 +5,23 @@ use std::{
 
 use rand::{distr::StandardUniform, Rng};
 
+use crate::utils::math::Axis;
+
 pub const MIN_FLOAT_64_PRECISION: f64 = 1e-160;
 const ALMOST_ZERO: f64 = 1e-8;
 
 #[derive(Debug, Copy, Clone, PartialEq, Default)]
 pub struct Point {
-    e: [f64; 3],
+    pub e: [f64; 3],
 }
 
 impl Point {
     pub fn new(x: f64, y: f64, z: f64) -> Self {
         Point { e: [x, y, z] }
+    }
+
+    pub fn coord(&self, ax: Axis) -> f64 {
+        self.e[std::convert::Into::<usize>::into(ax)]
     }
 
     pub fn x(self) -> f64 {

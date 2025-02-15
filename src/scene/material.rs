@@ -1,6 +1,5 @@
-use std::cell::RefCell;
-
-use rand::{distr::Uniform, prelude::Distribution, rngs::ThreadRng, Rng};
+use rand::{distr::Uniform, prelude::Distribution, Rng, SeedableRng};
+use rand_xoshiro::Xoshiro256PlusPlus;
 
 use crate::core::{
     point3::{Point, MIN_FLOAT_64_PRECISION},
@@ -10,7 +9,7 @@ use crate::core::{
 
 use super::hittable::{HitRec, NormalFace};
 
-pub trait Material {
+pub trait Material: Send + Sync {
     fn scatter(
         &self,
         _r_in: &Ray,
@@ -25,7 +24,6 @@ pub trait Material {
 pub struct Lambertian {
     albedo: Rgb,
     reflectance: f64,
-    rng: RefCell<ThreadRng>,
     between: Uniform<f64>,
 }
 
@@ -37,29 +35,23 @@ impl Lambertian {
         Lambertian {
             albedo,
             reflectance,
-            rng: RefCell::new(rand::rng()),
             between,
         }
     }
 }
 
 impl Material for Lambertian {
-    fn scatter(
-        &self,
-        _r_in: &Ray,
-        attenuation: &mut Rgb,
-        scattered: &mut Ray,
-        hr: &HitRec,
-    ) -> bool {
-        if self.between.sample(&mut *self.rng.borrow_mut()) < self.reflectance {
-            let mut scatter_dir = hr.n + Point::random_unit_on_sphere(&mut self.rng.borrow_mut());
+    fn scatter(&self, r_in: &Ray, attenuation: &mut Rgb, scattered: &mut Ray, hr: &HitRec) -> bool {
+        let mut rng = Xoshiro256PlusPlus::from_rng(&mut rand::rng());
+        if self.between.sample(&mut rng) < self.reflectance {
+            let mut scatter_dir = hr.n + Point::random_unit_on_sphere(&mut rng);
             // we need to avoid zero scatter direction due to possibility of
             // later getting NaNs and infinities. It may happen when randomly generated vector
             // is opposite to normal vector.
             if scatter_dir.near_zero() {
                 scatter_dir = hr.n;
             }
-            *scattered = Ray::new(hr.p, scatter_dir);
+            *scattered = Ray::new(hr.p, scatter_dir, Some(r_in.time()));
             *attenuation = self.albedo / self.reflectance;
             true
         } else {
@@ -88,7 +80,7 @@ impl Material for Metal {
             let mut rng = rand::rng();
             reflected = reflected.unit() + (Point::random_unit_on_sphere(&mut rng) * fuzz);
         }
-        *scattered = Ray::new(hr.p, reflected);
+        *scattered = Ray::new(hr.p, reflected, Some(r_in.time()));
         *attenuation = self.albedo;
         self.fuzz.is_none() || scattered.dir().scalar_prod(&hr.n) > 0.0
     }
@@ -114,8 +106,6 @@ impl Material for Dielectric {
         let unit_dir = r_in.dir().unit();
         let cos_theta = f64::min((-unit_dir).scalar_prod(&hr.n), 1.0);
         let sin_theta = f64::sqrt(1.0 - cos_theta * cos_theta);
-        // NOTE: may be a little bit more optimal to use already calculated cos_theta,
-        // but code will be even more hard to read
         let mut rng = rand::rng();
         let direction = if refraction_index * sin_theta > 1.0
             || reflectance(cos_theta, refraction_index) > rng.random::<f64>()
@@ -125,7 +115,7 @@ impl Material for Dielectric {
             refract(&unit_dir, &hr.n, refraction_index)
         };
 
-        *scattered = Ray::new(hr.p, direction);
+        *scattered = Ray::new(hr.p, direction, Some(r_in.time()));
         true
     }
 }

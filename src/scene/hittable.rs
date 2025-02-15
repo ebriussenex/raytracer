@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::{
     core::{point3::Point, ray::Ray},
@@ -7,7 +7,7 @@ use crate::{
 
 use assert_approx_eq::assert_approx_eq;
 
-use super::material::Material;
+use super::{aabb::Aabb, bvh::Bvh, material::Material};
 
 pub struct HitRec {
     // point, normal vec and t as scalar of where hit happened
@@ -15,7 +15,7 @@ pub struct HitRec {
     pub n: Point,
     pub t: f64,
     pub face: NormalFace,
-    pub mat: Rc<dyn Material>,
+    pub mat: Arc<dyn Material>,
 }
 
 // where from happened ray hit, inside surface or outside
@@ -25,7 +25,7 @@ pub enum NormalFace {
 }
 
 impl HitRec {
-    pub fn new(p: Point, n: Point, t: f64, mat: Rc<dyn Material>) -> Self {
+    pub fn new(p: Point, n: Point, t: f64, mat: Arc<dyn Material>) -> Self {
         HitRec {
             p,
             n,
@@ -52,29 +52,40 @@ impl HitRec {
     }
 }
 
-pub trait Hittable {
+pub trait Hittable: Send + Sync {
     fn hit(&self, ray: &Ray, ray_t_possible: &Interval) -> Option<HitRec>;
+    fn bounding_box(&self) -> &Aabb;
 }
 
 #[derive(Default)]
 pub struct Scene {
-    objects: Vec<Rc<dyn Hittable>>,
+    objects: Vec<Arc<dyn Hittable>>,
+    sum_aabb: Aabb,
+    bvh: Option<Bvh>,
 }
 
 impl Scene {
-    pub fn add(&mut self, object: Rc<dyn Hittable>) {
-        self.objects.push(object);
+    pub fn add(&mut self, object: &Arc<dyn Hittable>) {
+        self.objects.push(Arc::clone(object));
+        self.sum_aabb = self.sum_aabb.expand(object.bounding_box());
+    }
+
+    // should always be called before hit check
+    pub fn build_bvh(&mut self) {
+        if self.bvh.is_none() {
+            self.bvh = Some(Bvh::from_vec(&self.objects));
+        }
     }
 
     pub fn hit(&self, ray: &Ray, ray_t_possible: &Interval) -> Option<HitRec> {
-        let mut cur_closest = ray_t_possible.max();
-        let mut res_hr = None;
-        self.objects.iter().for_each(|ho| {
-            if let Some(hr) = ho.hit(ray, &Interval::new(ray_t_possible.min(), cur_closest)) {
-                cur_closest = hr.t;
-                res_hr = Some(hr);
-            }
-        });
-        res_hr
+        let bvh = self
+            .bvh
+            .as_ref()
+            .expect("expected bvh to exist when hit called");
+        bvh.hit(ray, ray_t_possible)
+    }
+
+    pub fn bounding_box(&self) -> &Aabb {
+        &self.sum_aabb
     }
 }

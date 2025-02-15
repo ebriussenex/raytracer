@@ -89,6 +89,16 @@ impl Defocuser {
     }
 }
 
+// shatter simulation for moving objects
+struct Shatter {
+    pub rng: RefCell<Xoshiro256PlusPlus>,
+}
+
+impl Shatter {
+    fn ray_time(&self) -> f64 {
+        self.rng.borrow_mut().random()
+    }
+}
 // Camera represents abstraction over view on objects through pixel-viewport
 // upleft_px_pos, px00_pos thus depend on camera pos, those should be updated on each camera pos
 // changes.
@@ -106,6 +116,7 @@ pub struct Camera {
     // TODO: make defocus optional
     defocus: Defocuser,
     max_bounce_depth: u32,
+    shatter: Shatter,
 }
 
 impl Camera {
@@ -167,9 +178,12 @@ impl Camera {
 
         // bluring - defocus radius
         let defocus_radius = focus_dist * f64::tan(defocus_angle / 2.0);
-        let mut rng = rand::rng();
-        let blur_rng = Xoshiro256PlusPlus::from_rng(&mut rng);
+        let blur_rng = Xoshiro256PlusPlus::from_rng(&mut rand::rng());
         let defocus = Defocuser::new(&basis, defocus_radius, defocus_angle, blur_rng);
+
+        // shatter
+        let shatter_rng = RefCell::new(Xoshiro256PlusPlus::from_rng(&mut rand::rng()));
+        let shatter = Shatter { rng: shatter_rng };
 
         // antialiaser
         let anti_aliaser = aa_samples_per_px
@@ -187,6 +201,7 @@ impl Camera {
             anti_aliaser,
             defocus,
             max_bounce_depth,
+            shatter,
         })
     }
 
@@ -209,7 +224,9 @@ impl Camera {
         };
 
         let ray_dir = px_sample - ray_orig;
-        Ray::new(ray_orig, ray_dir)
+        let ray_tm = self.shatter.ray_time();
+
+        Ray::new(ray_orig, ray_dir, Some(ray_tm))
     }
 
     pub fn render(&self, scene: &Scene) -> Result<(), RenderError> {
@@ -232,7 +249,7 @@ impl Camera {
                         + (self.px_du * f64::from(wn))
                         + (self.px_dv * f64::from(hn));
                     let ray_dir = px_center - self.lookfrom;
-                    let ray = Ray::new(self.lookfrom, ray_dir);
+                    let ray = Ray::new(self.lookfrom, ray_dir, None);
                     px_color = color(&ray, scene, max_depth);
                 }
                 px_color.write(io::stdout()).map_err(RenderError::WritePx)?;
