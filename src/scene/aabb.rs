@@ -1,6 +1,22 @@
+use std::cmp::Ordering;
+
 use crate::{
     core::{point3::Point, ray::Ray},
-    utils::{interval::Interval, math::Axis},
+    utils::{
+        interval::{self, Interval},
+        math::Axis,
+    },
+};
+
+#[derive(Debug)]
+pub enum IntervalErr {
+    ContainsNaN,
+}
+
+pub const EMPTY: Aabb = Aabb {
+    x: interval::EMPTY,
+    y: interval::EMPTY,
+    z: interval::EMPTY,
 };
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -83,6 +99,24 @@ impl Aabb {
             .min
             .partial_cmp(&other.axis_interval(axis).min)
             .expect("interval contains NaN which is impossible to compare")
+    }
+
+    pub fn longest_axis(&self) -> Axis {
+        let (xsize, ysize, zsize) = (self.x.size(), self.y.size(), self.z.size());
+        (match xsize.partial_cmp(&ysize) {
+            Some(ord) => match ord {
+                Ordering::Less | Ordering::Equal => match ysize.partial_cmp(&zsize) {
+                    Some(ord) => match ord {
+                        Ordering::Less | Ordering::Equal => Ok(Axis::Z),
+                        Ordering::Greater => Ok(Axis::Y),
+                    },
+                    None => Err(IntervalErr::ContainsNaN),
+                },
+                Ordering::Greater => Ok(Axis::X),
+            },
+            None => Err(IntervalErr::ContainsNaN),
+        })
+        .expect("interval contains NaN which is impossible to compare")
     }
 }
 

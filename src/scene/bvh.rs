@@ -6,7 +6,7 @@ use crate::{
 };
 
 use super::{
-    aabb::Aabb,
+    aabb::{self, Aabb},
     hittable::{HitRec, Hittable},
 };
 
@@ -26,8 +26,13 @@ impl Bvh {
         Self::new(objects.to_owned().as_mut())
     }
     pub fn new(objects: &mut [Arc<dyn Hittable>]) -> Self {
-        // choosing random axis
-        let axis = Axis::rand();
+        // build bbox of the span of source objects
+        let mut bbox = aabb::EMPTY;
+        objects
+            .iter()
+            .for_each(|obj| bbox = bbox.expand(obj.bounding_box()));
+
+        let axis = bbox.longest_axis();
 
         let (left, right) = match objects.len() {
             0 => unreachable!(),
@@ -49,7 +54,6 @@ impl Bvh {
                 )
             }
         };
-        let bbox = left.bounding_box().expand(right.bounding_box());
         Self { left, right, bbox }
     }
 
