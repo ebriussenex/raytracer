@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{f64::consts::FRAC_1_PI, f64::consts::PI, sync::Arc};
 
 use crate::{
     core::{point3::Point, ray::Ray},
@@ -68,6 +68,12 @@ impl Sphere {
             ),
         }
     }
+
+    fn uv(p: &Point) -> (f64, f64) {
+        let theta = -p.y().acos();
+        let phi = -p.z().atan2(p.x()) + PI;
+        (0.5 * phi * FRAC_1_PI, theta * FRAC_1_PI)
+    }
 }
 
 impl Hittable for Sphere {
@@ -98,6 +104,7 @@ impl Hittable for Sphere {
 
                 let mut hr = HitRec::new(p, outward_normal, t, Arc::clone(&self.mat));
                 hr.set_face_normal(ray, &outward_normal);
+                hr.set_uv(Sphere::uv(&outward_normal));
                 Some(hr)
             } else {
                 None

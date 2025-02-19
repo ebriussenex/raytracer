@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 assert_approx_eq = "1.1.0"
+image = "0.25.5"
 rand = "0.9.0"
 rand_xoshiro = "0.7.0"
 

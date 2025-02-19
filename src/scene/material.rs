@@ -1,19 +1,24 @@
+use std::sync::Arc;
+
 use rand::{distr::Uniform, prelude::Distribution, Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
 
 use crate::core::{
     point3::{Point, MIN_FLOAT_64_PRECISION},
     ray::Ray,
-    rgb::Rgb,
+    rgb::ARgb,
 };
 
-use super::hittable::{HitRec, NormalFace};
+use super::{
+    hittable::{HitRec, NormalFace},
+    texture::{SolidColor, Texture},
+};
 
 pub trait Material: Send + Sync {
     fn scatter(
         &self,
         _r_in: &Ray,
-        _attenuation: &mut Rgb,
+        _attenuation: &mut ARgb,
         _scattered: &mut Ray,
         _hr: &HitRec,
     ) -> bool {
@@ -22,18 +27,29 @@ pub trait Material: Send + Sync {
 }
 
 pub struct Lambertian {
-    albedo: Rgb,
+    texture: Arc<dyn Texture>,
     reflectance: f64,
     between: Uniform<f64>,
 }
 
 impl Lambertian {
-    pub fn new(albedo: Rgb, reflectance: f64) -> Self {
+    pub fn new(albedo: ARgb, reflectance: f64) -> Self {
         let between = Uniform::new(0.0, 1.0 + MIN_FLOAT_64_PRECISION)
             .expect("constants should not cause panic in any universe");
 
         Lambertian {
-            albedo,
+            texture: Arc::new(SolidColor::new(albedo)),
+            reflectance,
+            between,
+        }
+    }
+
+    pub fn with_texture(texture: &Arc<dyn Texture>, reflectance: f64) -> Self {
+        let between = Uniform::new(0.0, 1.0 + MIN_FLOAT_64_PRECISION)
+            .expect("constants should not cause panic in any universe");
+
+        Lambertian {
+            texture: Arc::clone(&texture),
             reflectance,
             between,
         }
@@ -41,7 +57,13 @@ impl Lambertian {
 }
 
 impl Material for Lambertian {
-    fn scatter(&self, r_in: &Ray, attenuation: &mut Rgb, scattered: &mut Ray, hr: &HitRec) -> bool {
+    fn scatter(
+        &self,
+        r_in: &Ray,
+        attenuation: &mut ARgb,
+        scattered: &mut Ray,
+        hr: &HitRec,
+    ) -> bool {
         let mut rng = Xoshiro256PlusPlus::from_rng(&mut rand::rng());
         if self.between.sample(&mut rng) < self.reflectance {
             let mut scatter_dir = hr.n + Point::random_unit_on_sphere(&mut rng);
@@ -52,7 +74,8 @@ impl Material for Lambertian {
                 scatter_dir = hr.n;
             }
             *scattered = Ray::new(hr.p, scatter_dir, Some(r_in.time()));
-            *attenuation = self.albedo / self.reflectance;
+            *attenuation =
+                self.texture.color(hr.tx_coord.u, hr.tx_coord.v, &hr.p) / self.reflectance;
             true
         } else {
             false
@@ -60,21 +83,25 @@ impl Material for Lambertian {
     }
 }
 
-// TODO: fuzz should be checked to be less or eq than 1,
-// just for api clarity
 pub struct Metal {
-    albedo: Rgb,
+    albedo: ARgb,
     fuzz: Option<f64>,
 }
 
 impl Metal {
-    pub fn new(albedo: Rgb, fuzz: Option<f64>) -> Self {
+    pub fn new(albedo: ARgb, fuzz: Option<f64>) -> Self {
         Metal { albedo, fuzz }
     }
 }
 
 impl Material for Metal {
-    fn scatter(&self, r_in: &Ray, attenuation: &mut Rgb, scattered: &mut Ray, hr: &HitRec) -> bool {
+    fn scatter(
+        &self,
+        r_in: &Ray,
+        attenuation: &mut ARgb,
+        scattered: &mut Ray,
+        hr: &HitRec,
+    ) -> bool {
         let mut reflected = r_in.dir().reflect(&hr.n);
         if let Some(fuzz) = self.fuzz {
             let mut rng = rand::rng();
@@ -97,8 +124,14 @@ impl Dielectric {
 }
 
 impl Material for Dielectric {
-    fn scatter(&self, r_in: &Ray, attenuation: &mut Rgb, scattered: &mut Ray, hr: &HitRec) -> bool {
-        *attenuation = Rgb::new(1.0, 1.0, 1.0);
+    fn scatter(
+        &self,
+        r_in: &Ray,
+        attenuation: &mut ARgb,
+        scattered: &mut Ray,
+        hr: &HitRec,
+    ) -> bool {
+        *attenuation = ARgb::new(1.0, 1.0, 1.0);
         let refraction_index = match hr.face {
             NormalFace::Inside => self.refraction_index,
             NormalFace::Outside => 1.0 / self.refraction_index,

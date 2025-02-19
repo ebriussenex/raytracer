@@ -13,7 +13,7 @@ use rand::{
 use rand_xoshiro::{rand_core::SeedableRng, Xoshiro256PlusPlus};
 
 use crate::{
-    core::{point3::Point, ray::Ray, rgb::Rgb},
+    core::{point3::Point, ray::Ray, rgb::ARgb},
     scene::hittable::Scene,
     utils::{interval::Interval, math::f64_to_u32},
 };
@@ -177,7 +177,7 @@ impl Camera {
         let px00_loc = vp_upper_left + (px_dv + px_du) * 0.5;
 
         // bluring - defocus radius
-        let defocus_radius = focus_dist * f64::tan(defocus_angle / 2.0);
+        let defocus_radius = focus_dist * f64::tan(defocus_angle * 0.5);
         let blur_rng = Xoshiro256PlusPlus::from_rng(&mut rand::rng());
         let defocus = Defocuser::new(&basis, defocus_radius, defocus_angle, blur_rng);
 
@@ -237,7 +237,7 @@ impl Camera {
         for hn in 0..self.img_height {
             for wn in 0..self.img_width {
                 let max_depth = self.max_bounce_depth;
-                let mut px_color = Rgb::default();
+                let mut px_color = ARgb::default();
                 if let Some(ref anti_aliaser) = &self.anti_aliaser {
                     for _ in 0..anti_aliaser.samples_per_pixel {
                         let r = self.ray_for(f64::from(wn), f64::from(hn));
@@ -265,22 +265,22 @@ impl Camera {
 }
 
 // it probably should be a scene method
-fn color(ray: &Ray, scene: &Scene, depth: u32) -> Rgb {
+fn color(ray: &Ray, scene: &Scene, depth: u32) -> ARgb {
     if depth == 0 {
-        return Rgb::new(0.0, 0.0, 0.0);
+        return ARgb::new(0.0, 0.0, 0.0);
     }
 
     if let Some(ref mut rec) = scene.hit(ray, &Interval::new(0.001, f64::INFINITY)) {
-        let attenuation = &mut Rgb::default();
+        let attenuation = &mut ARgb::default();
         let scattered = &mut Ray::default();
         if rec.mat.scatter(ray, attenuation, scattered, rec) {
             *attenuation * color(scattered, scene, depth - 1)
         } else {
-            Rgb::default()
+            ARgb::default()
         }
     } else {
         let unit_dir = ray.dir().unit();
         let a = 0.5 * (unit_dir.y() + 1.0);
-        Rgb::new(1.0, 1.0, 1.0) * (1.0 - a) + Rgb::new(0.5, 0.7, 1.0) * a
+        ARgb::new(1.0, 1.0, 1.0) * (1.0 - a) + ARgb::new(0.5, 0.7, 1.0) * a
     }
 }

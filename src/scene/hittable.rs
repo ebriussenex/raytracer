@@ -9,6 +9,12 @@ use assert_approx_eq::assert_approx_eq;
 
 use super::{aabb::Aabb, bvh::Bvh, material::Material};
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct TextureCoord {
+    pub u: f64,
+    pub v: f64,
+}
+
 pub struct HitRec {
     // point, normal vec and t as scalar of where hit happened
     pub p: Point,
@@ -16,6 +22,7 @@ pub struct HitRec {
     pub t: f64,
     pub face: NormalFace,
     pub mat: Arc<dyn Material>,
+    pub tx_coord: TextureCoord,
 }
 
 // where from happened ray hit, inside surface or outside
@@ -30,6 +37,7 @@ impl HitRec {
             p,
             n,
             t,
+            tx_coord: TextureCoord { u: 0.0, v: 0.0 },
             face: NormalFace::Inside,
             mat,
         }
@@ -49,6 +57,10 @@ impl HitRec {
             self.face = NormalFace::Inside;
             -*outward_normal
         }
+    }
+
+    pub fn set_uv(&mut self, uv: (f64, f64)) {
+        self.tx_coord = TextureCoord { u: uv.0, v: uv.1 }
     }
 }
 
@@ -83,9 +95,5 @@ impl Scene {
             .as_ref()
             .expect("expected bvh to exist when hit called");
         bvh.hit(ray, ray_t_possible)
-    }
-
-    pub fn bounding_box(&self) -> &Aabb {
-        &self.sum_aabb
     }
 }

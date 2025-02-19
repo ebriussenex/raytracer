@@ -3,15 +3,19 @@ use std::{
     ops::{Add, Div, Mul, RangeInclusive},
 };
 
+use image::Rgb;
 use rand::Rng;
 
 use crate::utils::math::safe_f64_to_u8_clamp;
 
+pub const SOLID_CYAN_COLOR: ARgb = ARgb {
+    rgb: [0.0, 1.0, 1.0],
+};
+
 #[derive(Clone, Copy, Default)]
-pub struct Rgb {
+pub struct ARgb {
     rgb: [f64; 3],
 }
-
 // gamma 2 transformation
 fn linear_to_gamma(linear: f64) -> f64 {
     if linear > 0.0 {
@@ -21,19 +25,28 @@ fn linear_to_gamma(linear: f64) -> f64 {
     }
 }
 
-impl std::fmt::Display for Rgb {
+impl std::fmt::Display for ARgb {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let u8r = self
             .rgb
             .map(linear_to_gamma)
-            .map(|x| safe_f64_to_u8_clamp(x * 255.999).expect("f64 is nan!"));
+            .map(|x| safe_f64_to_u8_clamp(x * 254.999).expect("f64 is nan!"));
         writeln!(f, "{} {} {}", u8r[0], u8r[1], u8r[2])
     }
 }
 
-impl Rgb {
+impl From<Rgb<u8>> for ARgb {
+    fn from(value: Rgb<u8>) -> Self {
+        let r = f64::from(value[0]) / 255.0;
+        let g = f64::from(value[1]) / 255.0;
+        let b = f64::from(value[2]) / 255.0;
+        ARgb::new(r, g, b)
+    }
+}
+
+impl ARgb {
     pub fn new(r: f64, g: f64, b: f64) -> Self {
-        Rgb { rgb: [r, g, b] }
+        ARgb { rgb: [r, g, b] }
     }
 
     pub fn write(&self, mut stream: impl Write) -> Result<()> {
@@ -60,7 +73,7 @@ impl Rgb {
     }
 }
 
-impl Mul<f64> for Rgb {
+impl Mul<f64> for ARgb {
     type Output = Self;
 
     fn mul(self, l: f64) -> Self::Output {
@@ -70,10 +83,10 @@ impl Mul<f64> for Rgb {
     }
 }
 
-impl Mul<Rgb> for Rgb {
+impl Mul<ARgb> for ARgb {
     type Output = Self;
 
-    fn mul(self, rhs: Rgb) -> Self::Output {
+    fn mul(self, rhs: ARgb) -> Self::Output {
         Self {
             rgb: [
                 self.rgb[0] * rhs.rgb[0],
@@ -84,7 +97,7 @@ impl Mul<Rgb> for Rgb {
     }
 }
 
-impl Div<f64> for Rgb {
+impl Div<f64> for ARgb {
     type Output = Self;
 
     fn div(self, l: f64) -> Self::Output {
@@ -94,7 +107,7 @@ impl Div<f64> for Rgb {
     }
 }
 
-impl Add for Rgb {
+impl Add for ARgb {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
