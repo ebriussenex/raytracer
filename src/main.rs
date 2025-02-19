@@ -17,7 +17,7 @@ use scene::{
     image_loader::load_image_to_rgb,
     material::{Dielectric, Lambertian, Material, Metal},
     sphere::Sphere,
-    texture::{CheckerTexture, ImageTexture},
+    texture::{CheckerTexture, ImageTexture, Texture},
 };
 
 use crate::camera::camera::Camera;
@@ -138,7 +138,7 @@ fn mars_texture_scene() -> Scene {
     let mut texture_path = PathBuf::from(TEXTURES_PATH);
     texture_path.push(EARTH_TEXTURE);
     let rgb_image = load_image_to_rgb(texture_path).expect("failed to load image");
-    let mars_texture = Arc::new(ImageTexture::new(Arc::new(rgb_image)));
+    let mars_texture = Arc::new(ImageTexture::new(Arc::new(rgb_image))) as Arc<dyn Texture>;
     let mars_material = Arc::new(Lambertian::with_texture(&mars_texture, 1.0));
 
     let mars_surface =
@@ -154,7 +154,7 @@ fn bouncing_balls_scene() -> Scene {
     let mut texture_path = PathBuf::from(TEXTURES_PATH);
     texture_path.push(MARS_TEXTURE);
     let rgb_image = load_image_to_rgb(texture_path).expect("failed to load image");
-    let mars_texture = Arc::new(ImageTexture::new(Arc::new(rgb_image)));
+    let mars_texture = Arc::new(ImageTexture::new(Arc::new(rgb_image))) as Arc<dyn Texture>;
     let mars_material = Arc::new(Lambertian::with_texture(&mars_texture, 1.0));
     let near3 = Point::new(-4.0, 1.0, 0.0);
     let near1 = Point::new(4.0, 1.0, 0.0);
@@ -166,8 +166,8 @@ fn bouncing_balls_scene() -> Scene {
         0.32,
         ARgb::new(0.2, 0.3, 0.1),
         ARgb::new(0.9, 0.9, 0.9),
-    ));
-    let ground_material: Arc<dyn Material> = Arc::new(Lambertian::with_texture(checker_tx, 1.0));
+    )) as Arc<dyn Texture>;
+    let ground_material: Arc<dyn Material> = Arc::new(Lambertian::with_texture(&checker_tx, 1.0));
     let ground_sphere: Arc<dyn Hittable> = Arc::new(Sphere::new_static(
         1000.0,
         Point::new(0.0, -1000.0, 0.0),
